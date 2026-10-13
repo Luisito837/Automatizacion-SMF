@@ -1,0 +1,58 @@
+1-FASE FILTRADO INICIAL DE LAS COMPRAS
+
+EL RECIBIR EL EXCEL SE DEBEN EXCLUIR LOS (MATERIALES) EN LA COLUMNA DescrCategoría
+EN LA COLUMNA CodTipoInv SE QUITAN TODOS LO QUE NO SON (CERVEZA, PEPSI-COLA, ALIMENTOS POLAR(SI EXISTE EN EL EXCEL))
+EN LA COLUMNA Comentario Cabecera EXCLUIR A LOS (OBSEQUIOS DE CLIENTES, RECONOCIMIENTO DE UTILIDAD)
+DESPUES DEL FILTRADO DE LAS COMPRAS, SE COPIA EL EXCEL PLATILLA EN LA HOJA DE COMPRAS
+
+2-FASE DE DISTRIBUCION
+
+HACER LA DISTRIBUCION CON LO QUE SE TIENE COMPRADO, ES DECIR LO QUE ESTA EN LA VENTA
+PARA NO COMPLICAR LAS COSAS Y DEJAR LA LIBERTAD AL EMPLEADO SI GENERARA UNA GRILLA CON LOS NOMBRES DE LOS VENDEDORES
+
+y si ella tiene el coso de categoria seria bueno que solo cargue los clientes y los fila de harina, al lado de la categoria un boton de autorellenar y un campo de texto de asignacion global, pone un 10 ahi a todos los vendedores se le pondra ese valor si hay suficiente stock, y un boton de limpiar todo, ademas en la grilla se podria editar el valor y al lado el menu dropdown si es caja o unidad, y claro un boton para declarar todo como caja o todo como unidad
+
+LA INTERFAZ SERIA DE TIPO GRID VIEW, CON UNA BARRA SUPERIOR DONDE UNA TENDRA, EL LOGO, EL DIA ACTUAL CON UN DROP DOWN CON TODOS LOS DIAS DE LA SEMANA (LUNES-VIERNES), UN BOTON PARA CARGAR EL REPORTE GENERAL, LUEGO OTRA BARRA PERO ESTA ES DE HERRAMIENTAS
+
+ESTA BARRA CONTENDRA UN LABEL DE CATEGORIAS (HARINA, MALTA, AGUA, ETC...) CON EL DROP DOWN CON LAS CATEGORIAS Y ADMITE BUSQUEDA ESCRIBIENDO, LUEGO UN CAMPO DE TEXTO PARA ESTABLECER UN VALOR GLOBAL A LA CATEGORIA SELECCIONADA SIEMPRE Y CUANDO EXISTA EN STOCK Y NO VALGA 0, UN BOTON DE AUTORELLENADO A LA CATEGORIA SELECCIONADA, BOTON DE LIMPIAR TODO A LA CATEGORIA SELECCIONADA, DOS BOTONES PARA REPORTAR TODO COMO CAJA O COMO POR UNIDAD EN LA CATEGORIA SELECCIONADA.
+
+AHORA VIENE LA TABLA, LA PRIMERA COLUMNA ES LA DE VENDEDORES, SE PONDRA EL NOMBRE DEL VENDEDOR, LA SIGUIENTE SE COLOCARA SOLO EL ALIMENTO SELECCIONADO EN LA BARRA DE HERRAMIENTAS, Y BUENO AQUI VAN LOS VALORES QUE SERAN EDITABLES JUNTO A UN DROPDOWN EN EL CUAL SE PUEDE PONER SI REPORTAR POR CAJA O POR UNIDAD PARA ESE VENDEDOR EN ESPECIFICO.
+
+POR ULTIMO UN PANEL LATERAL O INFERIOR CON EL STOCK DE LA CATEGORIA SELECCIONADA, CUANTAS DISPONIBLES, CUANTAS ASIGNADAS, CUANTAS RESTANTES
+
++---------------------------------------------------------------------------------------------------------+
+| [📅 Día: Viernes 09/10/2026 (Hoy) ▼]    [📂 Cargar Reporte General...]    [ ⚖️ Modo: [ Caja ] / Unidad ]  |
++---------------------------------------------------------------------------------------------------------+
++-----------------------------------------------------------------------------------------------------------------+
+| 📂 Categoría: [ Harinas ▼ ]    |   Valor Global: [  10  ]   [ ✨ Autorellenar ]   [ 🗑️ Limpiar Todo ]   [ 📦 Todo a Caja / 🔢 Todo a Unidad ] |
++-----------------------------------------------------------------------------------------------------------------+
++-----------------------------------------------------------------------------------+
+| [📅 Fecha: 07/10/2026]  [🔄 Sincronizar Compras del Día]         [💾 Guardar Todo] |
++-----------------------------------------------------------------------------------+
+| FILTROS: [ Negocio: Todos v ] [ Categoría: [ Cervezas ▼ ] ]    Stock Global: OK   |
++-----------------------------------------------------------------------------------+
+|                                                                                   |
+|  CLIENTES / VENDEDORES     | Polar Pilsen (Caj) | Maltin Polar (Caj) | Harina PAN  |
+| -------------------------- | ------------------ | ------------------ | ----------- |
+|  DIAZ INVERSIONES          |       [ 10 ]       |       [  5 ]       |    [ 20 ]   |
+|  INVERSIONES ECONOMICASA   |       [  0 ]       |       [ 12 ]       |    [ 15 ]   |
+|  FARMACIA DEL AHORRO       |       [  5 ]       |       [  2 ]       |    [ 10 ]   |
+|                                                                                   |
++-----------------------------------------------------------------------------------+
+|  PANEL LATERAL O INFERIOR (STOCK EN TIEMPO REAL):                                 |
+|  • Polar Pilsen: Disponibles 110 | Asignadas 15 | *Restantes: 95*                 |
+|  • Harina PAN:   Disponibles 50  | Asignadas 45 | *Restantes: 5 (¡Atención!)*     |
++-----------------------------------------------------------------------------------+
+
+OJO, la cerveza no se reporta
+
+en la interfaz aparecera el numero mas no es el resultado que se pondra en el excel
+en la distribucion se distribuye mediante caja o unidades, esa diferencia es segun la demanda del producto
+se le tiene que dar la libertad de como desea reportarlo pero el cargar los datos el sistema debe de asumir lo ideal
+
+Caja: Cerveza, Malta, Refrescos, Golden, 7up, Vinos
+Unidades: Agua, Jugos, Lipton, Gatorade
+
+3-FASE DE EXPORTACION
+
+se toman los datos y se rellena la plantilla siguiendo la nomenclatura: codigo_de_producto_

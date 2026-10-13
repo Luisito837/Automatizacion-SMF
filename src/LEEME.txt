@@ -1,0 +1,44 @@
+ROCO · DISTRIBUCIÓN POR CLIENTE
+Interfaz moderna inspirada en Windows 11
+========================================
+
+Esta versión combina la distribución por cliente con una interfaz más moderna:
+
+- Fondo claro, tarjetas blancas y azul de acento.
+- Tipografía Segoe UI y controles con mayor espacio interno.
+- Cabecera con selección del día, contador de clientes y acciones principales.
+- Barra de herramientas separada por grupos: alimento, cantidad global y acciones rápidas.
+- Tabla de distribución con filas alternas, encabezados claros y cantidad editable.
+- Selector CAJA/UNIDAD independiente para cada cliente y alimento.
+- Barras de desplazamiento que se ocultan cuando no son necesarias.
+- Panel lateral de stock con estados visuales para excedentes y stock completamente asignado.
+- Ventana de clientes con una presentación más limpia.
+
+MÓDULOS INCLUIDOS
+-----------------
+1. principal.py
+2. ventana_principal.py
+3. barra_superior.py
+4. barra_herramientas.py
+5. distribucion.py
+6. tabla_distribucion.py
+7. panel_stock.py
+
+INSTALACIÓN
+-----------
+1. Cierra ROCO si está abierto.
+2. Haz una copia de seguridad de los siete archivos indicados.
+3. Extrae este ZIP dentro de la carpeta raíz del proyecto y acepta reemplazarlos.
+4. Conserva los demás módulos del proyecto, entre ellos configuracion.py, inventario.py,
+   lista_buscable.py, catalogo_plantilla.py, lector_excel.py y procesador_reporte.py.
+5. Inicia la aplicación como de costumbre ejecutando principal.py.
+
+NOTAS
+-----
+- La apariencia se configura desde principal.py; no se necesita instalar un tema externo.
+- Se utiliza ttk con el tema clam para mantener una apariencia consistente entre versiones
+  compatibles de Windows y Tkinter. El diseño está inspirado en Windows 11, pero los bordes
+  redondeados nativos del sistema no forman parte de ttk estándar.
+- Los archivos Python de este paquete pasaron la comprobación de sintaxis y la interfaz se
+  visualizó con datos simulados. La comprobación completa con los archivos Excel reales requiere
+  ejecutar el proyecto con los módulos auxiliares y las plantillas locales del usuario.
