@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+
+# Datos de la empresa y archivos generados
+FACTURACION_SMF*.xlsx
+ReporteGeneralCompras*.xlsx
+vendedores.txt

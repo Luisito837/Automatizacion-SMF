@@ -36,14 +36,13 @@ class Asignacion:
 class EstadoNevera:
     """Cómo va un cliente con nevera ADC respecto a la regla de refrescos (en cajas)."""
     puertas: int
-    cuota_cajas: int  # 0 si no hay cuota definida para esas puertas
+    cuota_cajas: int  # cuota de prioridad; 0 si no hay cuota definida para esas puertas
     asignadas_cajas: float
     incumple_minimo: bool
-    excede_cuota: bool
 
     @property
     def hay_alerta(self) -> bool:
-        return self.incumple_minimo or self.excede_cuota
+        return self.incumple_minimo
 
     def texto(self) -> str:
         asignadas = f"{self.asignadas_cajas:.1f}".rstrip("0").rstrip(".")
@@ -51,8 +50,6 @@ class EstadoNevera:
         texto = f"{self.puertas} puerta{'s' if self.puertas != 1 else ''} · {progreso}"
         if self.incumple_minimo:
             texto += f"  ⚠ mín. {MINIMO_CAJAS_REFRESCO_ADC} cj"
-        if self.excede_cuota:
-            texto += "  ⚠ excede"
         return texto
 
 
@@ -197,36 +194,52 @@ class Distribucion:
     def _repartir_producto(self, producto: Producto) -> None:
         """Reparte el stock en partes iguales. En refrescos aplica la regla de neveras ADC:
 
-        - el cliente con nevera reporta en CAJA;
-        - recibe como mínimo MINIMO_CAJAS_REFRESCO_ADC cajas de ese producto (o nada, si su
-          cuota ya no alcanza o no queda stock);
-        - no pasa de su cuota de refrescos (25 cajas con 1 puerta, 60 con 2), contando lo
-          que ya tiene de los otros refrescos.
+        1. el cliente con nevera reporta en CAJA y recibe primero como mínimo
+           MINIMO_CAJAS_REFRESCO_ADC cajas de ese producto (o nada, si no alcanza el stock);
+        2. luego se le da prioridad hasta completar su cuota de refrescos (25 cajas con
+           1 puerta, 60 con 2), contando lo que ya tiene de los otros refrescos;
+        3. lo que quede se reparte en partes iguales entre todos. La cuota NO es un límite:
+           un cliente con nevera puede terminar con más de su cuota.
         """
         if not self.clientes:
             return
-        pasos, topes, minimos = {}, {}, {}
+        pasos, minimos, objetivos = {}, {}, {}
         for cliente in self.clientes:
             if producto.es_refresco and cliente.puertas > 0:
                 self.fijar_modo(cliente, producto, MODO_CAJA)  # la regla se expresa en cajas
                 minimos[cliente.identificador] = MINIMO_CAJAS_REFRESCO_ADC * self._por_caja(producto)
-                topes[cliente.identificador] = self._tope_por_nevera(cliente, producto)
+                objetivos[cliente.identificador] = self._cuota_pendiente(cliente, producto)
             pasos[cliente.identificador] = self._unidades_por_paso(cliente, producto)
 
         recibido = {cliente.identificador: 0 for cliente in self.clientes}
         restante = max(0, int(producto.stock_unidades or 0))
-        excluidos = set()  # clientes con nevera que no pueden llegar al mínimo
+        excluidos = set()  # clientes con nevera a quienes no les alcanza para el mínimo
         for cliente in self.clientes:
             identificador = cliente.identificador
             if identificador not in minimos:
                 continue
-            tope = topes[identificador]
-            if restante >= minimos[identificador] and (tope is None or tope >= minimos[identificador]):
+            if restante >= minimos[identificador]:
                 recibido[identificador] = minimos[identificador]
                 restante -= minimos[identificador]
             else:
                 excluidos.add(identificador)
 
+        # Prioridad: los clientes con nevera se acercan a su cuota antes que el resto.
+        hubo_reparto = True
+        while hubo_reparto:
+            hubo_reparto = False
+            for cliente in self.clientes:
+                identificador = cliente.identificador
+                paso = pasos[identificador]
+                if identificador not in objetivos or identificador in excluidos or restante < paso:
+                    continue
+                if recibido[identificador] + paso > objetivos[identificador]:
+                    continue
+                recibido[identificador] += paso
+                restante -= paso
+                hubo_reparto = True
+
+        # Reparto parejo de lo que queda, sin tope.
         hubo_reparto = True
         while hubo_reparto:
             hubo_reparto = False
@@ -234,9 +247,6 @@ class Distribucion:
                 identificador = cliente.identificador
                 paso = pasos[identificador]
                 if identificador in excluidos or restante < paso:
-                    continue
-                tope = topes.get(identificador)
-                if tope is not None and recibido[identificador] + paso > tope:
                     continue
                 recibido[identificador] += paso
                 restante -= paso
@@ -258,11 +268,11 @@ class Distribucion:
             for p in self._refrescos() if excepto is None or p.codigo != excepto.codigo
         )
 
-    def _tope_por_nevera(self, cliente: ClienteDistribucion, producto: Producto):
-        """Unidades que aún puede recibir de este producto según su cuota; None si no hay cuota."""
+    def _cuota_pendiente(self, cliente: ClienteDistribucion, producto: Producto) -> int:
+        """Unidades de este producto que le faltan para completar su cuota de refrescos (0 si no hay cuota)."""
         cuota = CUOTA_REFRESCOS_POR_PUERTAS.get(cliente.puertas)
         if cuota is None:
-            return None
+            return 0
         libres = cuota - self._cajas_de_refrescos(cliente, excepto=producto)
         return max(0, int(libres * self._por_caja(producto) + 1e-9))
 
@@ -276,7 +286,7 @@ class Distribucion:
             0 < self.unidades_asignadas(cliente, p) < MINIMO_CAJAS_REFRESCO_ADC * self._por_caja(p)
             for p in self._refrescos()
         )
-        return EstadoNevera(cliente.puertas, cuota, total, incumple, bool(cuota) and total > cuota + 1e-9)
+        return EstadoNevera(cliente.puertas, cuota, total, incumple)
 
     # ---------- exportación ----------
     def asignaciones(self) -> list:

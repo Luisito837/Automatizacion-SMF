@@ -13,7 +13,8 @@ MODO_UNIDAD = "UNIDAD"
 MODOS = (MODO_CAJA, MODO_UNIDAD)
 
 # Regla de neveras (solo refrescos): clientes con "CLIENTES DE ADC" en la plantilla.
-# Cajas de refrescos que se le asignan según las puertas de la nevera (3 puertas: sin definir).
+# Cuota de refrescos (en cajas) según las puertas de la nevera. Es una PRIORIDAD, no un límite:
+# se les asigna primero a ellos, pero pueden recibir más. (3 puertas: sin cuota definida).
 CUOTA_REFRESCOS_POR_PUERTAS = {1: 25, 2: 60}
 # Con nevera ADC, cada refresco asignado no puede ser menor a estas cajas.
 MINIMO_CAJAS_REFRESCO_ADC = 6
