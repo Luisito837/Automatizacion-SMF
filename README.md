@@ -1,7 +1,5 @@
 # Automatización SMF · ROCO
 
-# Automatización SMF · ROCO
-
 Aplicación de escritorio en Python/Tkinter para distribuir entre los clientes por día de la semana lo que se compró, usando el Reporte General de Compras y la plantilla FACTURACION SMF.
 
 ## Características principales
