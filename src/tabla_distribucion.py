@@ -2,7 +2,7 @@
 import tkinter as tk
 from tkinter import ttk
 
-from configuracion import MODO_CAJA, MODO_UNIDAD, MODOS
+from configuracion import MODO_BULTO, MODO_CAJA, MODO_UNIDAD
 from utilidades import texto_a_entero
 
 
@@ -121,11 +121,17 @@ class TablaDistribucion:
         else:
             nombre_producto = self.producto.descripcion or str(self.producto.codigo)
             unidades_caja = max(1, int(self.producto.unidades_por_caja or 1))
-            self.etiqueta_producto.config(text=f"{nombre_producto}  ·  {unidades_caja} un/caja")
+            if self.producto.es_bulto:
+                detalle_unidad = "bulto · sin conversión"
+            elif self.producto.solo_cajas:
+                detalle_unidad = f"{unidades_caja} unidades/caja · Pepsi se reporta por caja"
+            else:
+                detalle_unidad = f"{unidades_caja} unidades por caja"
+            self.etiqueta_producto.config(text=f"{nombre_producto}  ·  {detalle_unidad}")
 
             self._crear_encabezado(self.COLUMNA_CLIENTE, "CLIENTE")
             self._crear_encabezado(
-                self.COLUMNA_CANTIDAD, f"CANTIDAD  ·  {nombre_producto}\n({unidades_caja} unidades por caja)"
+                self.COLUMNA_CANTIDAD, f"CANTIDAD  ·  {nombre_producto}\n({detalle_unidad})"
             )
             self._crear_encabezado(self.COLUMNA_MODO, "REPORTAR POR")
             self._crear_encabezado(self.COLUMNA_NEVERA, "NEVERA (ADC)\nrefrescos asignados / cuota")
@@ -157,9 +163,10 @@ class TablaDistribucion:
                     sticky="nsew", padx=8, pady=4
                 )
 
+                modos_permitidos = self.distribucion.modos_permitidos(cliente, self.producto)
                 variable_modo = tk.StringVar(value=self.distribucion.modo_de(cliente, self.producto))
                 desplegable = ttk.Combobox(
-                    self.interior, values=MODOS, textvariable=variable_modo,
+                    self.interior, values=modos_permitidos, textvariable=variable_modo,
                     state="readonly", width=12, style="Table.TCombobox"
                 )
                 desplegable.bind(
@@ -224,17 +231,19 @@ class TablaDistribucion:
                 celda.bell()
                 return
             if valor != anterior:
-                self.distribucion.establecer_cantidad(cliente, self.producto.codigo, valor)
+                aplicado = self.distribucion.establecer_cantidad(cliente, self.producto.codigo, valor)
                 self._actualizar_neveras()
                 self.al_cambiar_datos()
-            self._poner_texto(celda, str(valor) if valor else "")
+            else:
+                aplicado = anterior
+            self._poner_texto(celda, str(aplicado) if aplicado else "")
         except tk.TclError:
             return
 
     def _actualizar_neveras(self) -> None:
         """Muestra, por cliente con nevera ADC, lo asignado de refrescos frente a su cuota."""
         for fila in self._filas:
-            estado = self.distribucion.estado_nevera(fila["cliente"])
+            estado = self.distribucion.estado_nevera(fila["cliente"], self.producto)
             try:
                 if estado is None:
                     fila["nevera"].config(text="", fg=COLOR_SECUNDARIO)
@@ -247,9 +256,13 @@ class TablaDistribucion:
     def _cambiar_modo(self, cliente, modo) -> None:
         if self.producto is None:
             return
-        if modo not in MODOS:
-            modo = MODO_CAJA
-        self.distribucion.fijar_modo(cliente, self.producto, modo)
+        if modo not in self.distribucion.modos_permitidos(cliente, self.producto):
+            modo = self.distribucion.modo_predeterminado(cliente, self.producto)
+        modo_final = self.distribucion.fijar_modo(cliente, self.producto, modo)
+        for fila in self._filas:
+            if fila["cliente"].identificador == cliente.identificador:
+                fila["variable_modo"].set(modo_final)
+                break
         self._actualizar_neveras()
         self.al_cambiar_datos()
 
@@ -259,10 +272,16 @@ class TablaDistribucion:
             nuevo = MODO_CAJA
         elif tecla == "u":
             nuevo = MODO_UNIDAD
+        elif tecla == "b":
+            nuevo = MODO_BULTO
         elif tecla == "space":
-            nuevo = MODO_UNIDAD if variable.get() == MODO_CAJA else MODO_CAJA
+            permitidos = self.distribucion.modos_permitidos(cliente, self.producto)
+            indice = permitidos.index(variable.get()) if variable.get() in permitidos else 0
+            nuevo = permitidos[(indice + 1) % len(permitidos)]
         else:
             return None
+        if nuevo not in self.distribucion.modos_permitidos(cliente, self.producto):
+            return "break"
         variable.set(nuevo)
         self._cambiar_modo(cliente, nuevo)
         return "break"

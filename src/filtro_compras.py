@@ -11,10 +11,10 @@ class ReglasFiltro:
 
     # DescrCategoría: se EXCLUYEN las filas con exactamente estas categorías.
     categorias_excluidas: tuple = ("MATERIALES",)
-    # CodTipoInv: se CONSERVAN solo las filas cuyo tipo contenga alguno de estos textos.
-    # "CERVECERIA POLAR" es como el sistema nombra a la cerveza en este reporte.
+    # CodTipoInv: lista cerrada según la regla de negocio. En el reporte real, cerveza
+    # aparece como "CERVECERIA POLAR_C.A", por eso se acepta como alias explícito.
     tipos_inventario_permitidos: tuple = (
-        "CERVEZA", "CERVECERIA POLAR", "PEPSI", "ALIMENTOS POLAR", "MALTA", "REFRESCO", "SOLERA", "POLAR")
+        "CERVEZA", "CERVECERIA POLAR_C.A", "PEPSI-COLA", "ALIMENTOS POLAR")
     # Comentario Cabecera: se EXCLUYEN las filas cuyo comentario contenga estos textos.
     comentarios_excluidos: tuple = ("OBSEQUIOS DE CLIENTES", "RECONOCIMIENTO DE UTILIDAD")
 
@@ -69,7 +69,8 @@ class FiltroCompras:
 
     def _tipo_inventario_permitido(self, fila) -> bool:
         tipo = normalizar_texto(fila.get("CodTipoInv"))
-        return any(normalizar_texto(p) in tipo for p in self.reglas.tipos_inventario_permitidos if tipo)
+        permitidos = {normalizar_texto(valor) for valor in self.reglas.tipos_inventario_permitidos}
+        return bool(tipo) and tipo in permitidos
 
     def _comentario_excluido(self, fila) -> bool:
         comentario = normalizar_texto(fila.get("Comentario Cabecera"))

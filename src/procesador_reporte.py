@@ -62,5 +62,13 @@ class ProcesadorReporte:
 
     @staticmethod
     def _ruta_de_salida(ruta_plantilla: Path) -> Path:
+        """Crea un nombre nuevo cada vez; evita pisar el estado de un reporte previo."""
         fecha = datetime.date.today().strftime("%Y-%m-%d")
-        return ruta_plantilla.with_name(f"{ruta_plantilla.stem}_{fecha}{ruta_plantilla.suffix}")
+        candidato = ruta_plantilla.with_name(f"{ruta_plantilla.stem}_{fecha}{ruta_plantilla.suffix}")
+        secuencia = 2
+        while candidato.exists():
+            candidato = ruta_plantilla.with_name(
+                f"{ruta_plantilla.stem}_{fecha}_{secuencia}{ruta_plantilla.suffix}"
+            )
+            secuencia += 1
+        return candidato

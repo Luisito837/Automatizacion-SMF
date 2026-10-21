@@ -124,6 +124,14 @@ def configurar_tema_roco(raiz: tk.Tk) -> None:
     estilo.configure("Danger.TButton", background=COLORES["rojo_suave"], foreground=COLORES["rojo"],
                      padding=(11, 8), borderwidth=0)
     estilo.map("Danger.TButton", background=[("pressed", "#FEE4E2"), ("active", "#FEE4E2")])
+    estilo.configure("Category.TButton", background="#F7F9FC", foreground=COLORES["texto"],
+                     padding=(10, 6), bordercolor=COLORES["borde"], borderwidth=1,
+                     font=("Segoe UI", 9))
+    estilo.map("Category.TButton", background=[("pressed", "#E8EEF7"), ("active", "#EFF4FB")])
+    estilo.configure("CategorySelected.TButton", background=COLORES["azul"], foreground="#FFFFFF",
+                     padding=(10, 6), borderwidth=0, font=("Segoe UI", 9, "bold"))
+    estilo.map("CategorySelected.TButton", background=[("pressed", COLORES["azul_hover"]),
+                    ("active", COLORES["azul_hover"])], foreground=[("!disabled", "#FFFFFF")])
 
     # Tabla y desplazamiento.
     estilo.configure("Treeview", background=COLORES["superficie"],

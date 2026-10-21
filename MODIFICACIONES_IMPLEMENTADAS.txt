@@ -1,0 +1,49 @@
+MODIFICACIONES IMPLEMENTADAS EN ESTA VERSION DE ROCO
+====================================================
+
+1. BUSQUEDA Y FILTROS
+- Categorías leídas desde DescrCategoría del Reporte General de Compras.
+- Categorías como botones y selector de producto/SKU buscable, limitado a la categoría activa.
+
+2. CONVERSION Y STOCK
+- Factor principal desde la hoja INVENTARIO, columna UND.
+- Para los SKU ausentes de INVENTARIO, respaldo desde LISTA, columna UD por CJ.
+- Factor 1 significa BULTO y no multiplica la cantidad.
+- CAJ se convierte a unidades mediante cantidad × factor; UNI/UND se conserva como unidades.
+- Pepsi-Cola se restringe a reportar por caja, excepto los artículos con factor 1, que se tratan como bultos.
+- Panel de stock muestra cajas completas, unidades sueltas y bultos por separado.
+
+3. RECUPERAR UN GUARDADO
+- Guardar Excel escribe asignaciones como código limpio + espacio + cantidad y sufijo, por ejemplo:
+  12345 6und, 12345 2cj o 12345 2bto.
+- Abrir guardado reconstruye el inventario desde las compras incluidas en la plantilla y recupera las asignaciones.
+- Se guardan asignaciones de todos los días del catálogo, no solo del día visible.
+- Las nuevas cargas de reporte eligen una ruta libre para no sobrescribir un guardado del mismo día.
+
+4. HERRAMIENTAS DE EFICIENCIA
+- Repartir el restante para un producto.
+- Completar categoría o todas las categorías.
+- Limpiar la asignación del producto en el día visible.
+- Resumen semanal por SKU para detectar saldo cero, remanentes y exceso.
+- Atajos para moverse por clientes y productos.
+
+5. FACTORES EDITABLES
+- Botón Factores: permite buscar producto/SKU, consultar factor y cambiarlo manualmente.
+- Los cambios se guardan en src/factores_conversion.json y se aplican en las cargas siguientes.
+
+6. ADC (REGLA TEMPORAL)
+- Solo para productos con DescrCategoría = REFRESCO.
+- 1 PUERTA: cuota de autorrelleno individual por SKU de 25 cajas.
+- 2 PUERTA: cuota de autorrelleno individual por SKU de 60 cajas.
+- Cualquier cantidad asignada a un cliente ADC debe ser al menos 6 cajas.
+- 3 PUERTA: no se asignó una cuota fija porque el equipo aún debe confirmarla; aplica el mínimo de 6 cajas.
+
+VERIFICACIONES REALIZADAS
+========================
+- Compilación Python de todos los módulos: correcta.
+- Arranque de la interfaz Tkinter bajo servidor gráfico virtual: correcto.
+- Reporte de ejemplo: 106 filas leídas, 61 conservadas, 42 SKU con stock después de agrupar compras.
+- Conversión real: MALTIN POLAR COCO, 17 cajas × factor 24 (INVENTARIO!UND) = 408 unidades.
+- Diferencias entre hojas: KONGA Q140 usa factor 14 de INVENTARIO!UND; LISTA!UD por CJ muestra 112, por lo que se prioriza el factor de INVENTARIO solicitado.
+- Pruebas de factor 1 como bulto, modo solo-caja para Pepsi-Cola, ADC y recuperación/exportación del guardado: correctas.
+- Prueba integrada de interfaz: cargar reporte, asignar 2 cajas, guardar Excel y reabrir con 2 cajas recuperadas: correcta.

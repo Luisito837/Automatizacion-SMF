@@ -1,10 +1,4 @@
-"""Exporta la distribución a la hoja de clientes de la plantilla (cliente x categoría).
-
-Cada celda lleva lo asignado con el formato: codigo_producto + espacio + numero + und/cj.
-Ejemplo: 'F07103 5 cj'. Si un cliente recibe varios productos de la misma categoría,
-van en la misma celda separados por SEPARADOR.
-Como al cargar el reporte, solo se modifica el XML de esa hoja dentro del .xlsx.
-"""
+"""Exporta y recupera la distribución guardada dentro de la plantilla SMF."""
 import re
 import zipfile
 from dataclasses import dataclass, field
@@ -15,11 +9,10 @@ from openpyxl.utils import column_index_from_string, get_column_letter
 
 from escritor_plantilla import parte_xml_de_la_hoja
 from lector_excel import LectorExcel
-from utilidades import normalizar_texto
+from utilidades import normalizar_codigo, normalizar_texto
 
 SEPARADOR = ", "
 
-# Categoría de la hoja LISTA -> cómo se llama su columna en la hoja de clientes (sin el %).
 EQUIVALENCIAS_DE_CATEGORIA = {
     "COLAS NEGRAS": ("COLA NEGRA",),
     "COLAS BLANCAS": ("COLA BLANCA",),
@@ -31,9 +24,15 @@ EQUIVALENCIAS_DE_CATEGORIA = {
     "TRADICIONAL": ("CER",),
     "LIGHT": ("CER",),
     "PREMIUN": ("CER",),
+    "PREMIUM": ("CER",),
     "SANGRIA": ("SANG",),
     "VINO NACIONAL": ("VINOS",),
 }
+
+PATRON_ASIGNACION = re.compile(
+    r"(?P<codigo>[A-Za-z0-9_-]+)\s+(?P<cantidad>\d+)\s*(?P<modo>UND|UN|CJ|CAJA|CAJAS|BTO|BULTO|BULTOS)\b",
+    re.IGNORECASE,
+)
 
 
 @dataclass
@@ -47,7 +46,7 @@ class ResultadoExportacion:
     def resumen(self) -> str:
         lineas = [
             f"Clientes con datos exportados: {self.clientes_escritos}",
-            f"Productos escritos: {self.entradas_escritas}",
+            f"Asignaciones exportadas: {self.entradas_escritas}",
             "",
             f"Archivo:\n{self.ruta_salida}",
         ]
@@ -65,7 +64,7 @@ class ExportadorPlantilla:
         self.lector_excel = lector_excel
 
     def exportar(self, ruta_base, asignaciones, ruta_salida) -> ResultadoExportacion:
-        """Copia 'ruta_base' a 'ruta_salida' con las asignaciones escritas en la hoja de clientes."""
+        """Copia el libro, limpia la distribución previa y escribe el estado actual completo."""
         ruta_base, ruta_salida = Path(ruta_base), Path(ruta_salida)
         if ruta_base.resolve() == ruta_salida.resolve():
             raise ValueError("Elija un nombre distinto al del archivo de origen para no sobrescribirlo.")
@@ -77,37 +76,89 @@ class ExportadorPlantilla:
         columnas = self._columnas_de_categoria(hoja)
         resultado = ResultadoExportacion(ruta_salida)
         celdas = self._agrupar_en_celdas(asignaciones, filas_de_clientes, columnas, resultado)
+        filas_limpiables = set(filas_de_clientes.values())
+        columnas_limpiables = {columna for columna, _es_producto in columnas.values()}
 
         parte_xml = parte_xml_de_la_hoja(ruta_base, hoja.nombre)
-        with zipfile.ZipFile(ruta_base) as origen, \
-                zipfile.ZipFile(ruta_salida, "w", zipfile.ZIP_DEFLATED) as destino:
+        with zipfile.ZipFile(ruta_base) as origen, zipfile.ZipFile(ruta_salida, "w", zipfile.ZIP_DEFLATED) as destino:
             for parte in origen.infolist():
                 contenido = origen.read(parte.filename)
                 if parte.filename == parte_xml:
-                    contenido = self._escribir_celdas(contenido.decode("utf-8"), celdas).encode("utf-8")
+                    contenido = self._escribir_celdas(
+                        contenido.decode("utf-8"), celdas, filas_limpiables, columnas_limpiables
+                    ).encode("utf-8")
                 destino.writestr(parte, contenido)
         return resultado
 
-    # ---------- ubicar filas y columnas ----------
+    def leer_asignaciones_guardadas(self, ruta, productos) -> list:
+        """Lee cadenas de distribución exportadas, para reabrir una plantilla como un guardado."""
+        hoja = self.lector_excel.buscar_hoja_con_encabezados(ruta, ("DIA", "CLIENTE"))
+        if hoja is None:
+            return []
+        col = hoja.columnas
+        idx_dia, idx_cliente = col["DIA"], col["CLIENTE"]
+        idx_codigo = col.get("CODIGO SISTEMA")
+        idx_cep = col.get("CEP")
+        producto_por_codigo = {normalizar_codigo(p.codigo): p for p in productos}
+        registros = []
+        for indice_fila, fila in enumerate(hoja.filas):
+            if indice_fila <= hoja.fila_encabezados:
+                continue
+            nombre = self._valor(fila, idx_cliente)
+            dia = self._valor(fila, idx_dia)
+            if not nombre or not dia:
+                continue
+            codigo_cliente = self._valor(fila, idx_codigo) if idx_codigo is not None else ""
+            cep = self._valor(fila, idx_cep) if idx_cep is not None else ""
+            for valor in fila:
+                if not isinstance(valor, str) or not valor.strip():
+                    continue
+                for coincidencia in PATRON_ASIGNACION.finditer(valor):
+                    codigo = normalizar_codigo(coincidencia.group("codigo"))
+                    if codigo not in producto_por_codigo:
+                        continue
+                    modo_texto = normalizar_texto(coincidencia.group("modo"))
+                    modo = "BULTO" if modo_texto.startswith(("BTO", "BULTO")) else (
+                        "UNIDAD" if modo_texto.startswith(("UND", "UN")) else "CAJA")
+                    registros.append({
+                        "dia": dia,
+                        "cliente": nombre,
+                        "codigo_sistema": codigo_cliente,
+                        "cep": cep,
+                        "producto_codigo": codigo,
+                        "cantidad": int(coincidencia.group("cantidad")),
+                        "modo": modo,
+                    })
+        return registros
+
+    # ---------- localizar clientes y columnas ----------
     @staticmethod
     def _filas_de_clientes(hoja) -> dict:
-        """{(día, cliente): número de fila de Excel}."""
-        indice_dia, indice_cliente = hoja.columnas["DIA"], hoja.columnas["CLIENTE"]
+        """Índice de fila por día+código/CEP/nombre para no confundir clientes homónimos."""
+        col = hoja.columnas
+        idx_dia, idx_cliente = col["DIA"], col["CLIENTE"]
+        idx_codigo, idx_cep = col.get("CODIGO SISTEMA"), col.get("CEP")
         filas = {}
         for numero, fila in enumerate(hoja.filas):
-            if numero <= hoja.fila_encabezados or max(indice_dia, indice_cliente) >= len(fila):
+            if numero <= hoja.fila_encabezados:
                 continue
-            clave = (normalizar_texto(fila[indice_dia]), normalizar_texto(fila[indice_cliente]))
-            if clave[0] and clave[1]:
-                filas[clave] = numero + 1
+            dia = normalizar_texto(ExportadorPlantilla._valor(fila, idx_dia))
+            nombre = normalizar_texto(ExportadorPlantilla._valor(fila, idx_cliente))
+            if not dia or not nombre:
+                continue
+            excel_row = numero + 1
+            codigo = normalizar_texto(ExportadorPlantilla._valor(fila, idx_codigo)) if idx_codigo is not None else ""
+            cep = normalizar_texto(ExportadorPlantilla._valor(fila, idx_cep)) if idx_cep is not None else ""
+            if codigo:
+                filas[(dia, "CODIGO", codigo)] = excel_row
+            if cep:
+                filas[(dia, "CEP", cep)] = excel_row
+            filas[(dia, "NOMBRE", nombre)] = excel_row
         return filas
 
     @staticmethod
     def _columnas_de_categoria(hoja) -> dict:
-        """Lee la fila de encabezados de categorías (la fila justo encima de DIA/CLIENTE).
-
-        Devuelve {texto limpio: (número de columna, es_columna_de_producto)}.
-        """
+        """Lee etiquetas de categoría de la fila justo encima de DIA/CLIENTE."""
         if hoja.fila_encabezados == 0:
             return {}
         columnas = {}
@@ -119,7 +170,6 @@ class ExportadorPlantilla:
 
     @staticmethod
     def _columna_para(producto, columnas):
-        """Primero busca una columna con el nombre del producto (p. ej. ROCKSTAR); luego por categoría."""
         descripcion = normalizar_texto(producto.descripcion)
         for texto, (numero, es_producto) in columnas.items():
             if es_producto and texto in descripcion:
@@ -131,12 +181,17 @@ class ExportadorPlantilla:
         return None
 
     def _agrupar_en_celdas(self, asignaciones, filas_de_clientes, columnas, resultado) -> dict:
-        """{fila: {columna: texto}} con los productos de cada celda unidos por SEPARADOR."""
         textos = {}
         clientes_escritos, sin_fila, sin_columna = set(), set(), set()
         for asignacion in asignaciones:
             cliente = asignacion.cliente
-            fila = filas_de_clientes.get((normalizar_texto(cliente.dia), normalizar_texto(cliente.nombre)))
+            dia = normalizar_texto(cliente.dia)
+            codigo = normalizar_texto(getattr(cliente, "codigo_sistema", ""))
+            cep = normalizar_texto(getattr(cliente, "cep", ""))
+            nombre = normalizar_texto(cliente.nombre)
+            fila = (filas_de_clientes.get((dia, "CODIGO", codigo)) if codigo else None)
+            fila = fila or (filas_de_clientes.get((dia, "CEP", cep)) if cep else None)
+            fila = fila or filas_de_clientes.get((dia, "NOMBRE", nombre))
             if fila is None:
                 sin_fila.add(cliente.nombre)
                 continue
@@ -155,20 +210,29 @@ class ExportadorPlantilla:
             celdas.setdefault(fila, {})[columna] = SEPARADOR.join(lista)
         return celdas
 
-    # ---------- escribir en el XML de la hoja ----------
+    # ---------- XML interno de la hoja de clientes ----------
     @staticmethod
-    def _escribir_celdas(xml, celdas_por_fila) -> str:
+    def _escribir_celdas(xml, celdas_por_fila, filas_a_limpiar=None, columnas_a_limpiar=None) -> str:
+        filas_a_limpiar = filas_a_limpiar or set()
+        columnas_a_limpiar = columnas_a_limpiar or set()
         patron_fila = re.compile(r'<row r="(\d+)"([^>]*?)(?:/>|>(.*?)</row>)', re.S)
         patron_celda = re.compile(r'<c r="([A-Z]+)\d+"[^>]*?(?:/>|>.*?</c>)', re.S)
 
         def reemplazar(coincidencia):
             fila = int(coincidencia.group(1))
-            nuevas = celdas_por_fila.get(fila)
-            if not nuevas:
+            nuevas = celdas_por_fila.get(fila, {})
+            if fila not in filas_a_limpiar and not nuevas:
                 return coincidencia.group(0)
             atributos = re.sub(r'\sspans="[^"]*"', "", coincidencia.group(2))
             celdas = {column_index_from_string(c.group(1)): c.group(0)
                       for c in patron_celda.finditer(coincidencia.group(3) or "")}
+            if fila in filas_a_limpiar:
+                for columna in columnas_a_limpiar:
+                    if columna in celdas:
+                        anterior = celdas[columna]
+                        estilo = re.search(r'\ss="(\d+)"', anterior.split(">")[0])
+                        atributo_estilo = f' s="{estilo.group(1)}"' if estilo else ""
+                        celdas[columna] = f'<c r="{get_column_letter(columna)}{fila}"{atributo_estilo}/>'
             for columna, texto in nuevas.items():
                 anterior = celdas.get(columna, "")
                 estilo = re.search(r'\ss="(\d+)"', anterior.split(">")[0])
@@ -179,4 +243,11 @@ class ExportadorPlantilla:
                     f'<is><t xml:space="preserve">{escape(limpio)}</t></is></c>')
             return f'<row r="{fila}"{atributos}>' + "".join(celdas[k] for k in sorted(celdas)) + "</row>"
 
-        return patron_fila.sub(reemplazar, xml)
+        xml = patron_fila.sub(reemplazar, xml)
+        return xml
+
+    @staticmethod
+    def _valor(fila, indice) -> str:
+        if indice is None or indice < 0 or indice >= len(fila) or fila[indice] is None:
+            return ""
+        return str(fila[indice]).strip()

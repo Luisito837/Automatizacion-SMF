@@ -1,44 +1,48 @@
 ROCO · DISTRIBUCIÓN POR CLIENTE
-Interfaz moderna inspirada en Windows 11
-========================================
+Interfaz moderna tipo Windows 11 (Tkinter)
+============================================
 
-Esta versión combina la distribución por cliente con una interfaz más moderna:
-
-- Fondo claro, tarjetas blancas y azul de acento.
-- Tipografía Segoe UI y controles con mayor espacio interno.
-- Cabecera con selección del día, contador de clientes y acciones principales.
-- Barra de herramientas separada por grupos: alimento, cantidad global y acciones rápidas.
-- Tabla de distribución con filas alternas, encabezados claros y cantidad editable.
-- Selector CAJA/UNIDAD independiente para cada cliente y alimento.
-- Barras de desplazamiento que se ocultan cuando no son necesarias.
-- Panel lateral de stock con estados visuales para excedentes y stock completamente asignado.
-- Ventana de clientes con una presentación más limpia.
-
-MÓDULOS INCLUIDOS
------------------
-1. principal.py
-2. ventana_principal.py
-3. barra_superior.py
-4. barra_herramientas.py
-5. distribucion.py
-6. tabla_distribucion.py
-7. panel_stock.py
+FUNCIONES INCLUIDAS
+-------------------
+- Categorías en botones, derivadas de DescrCategoría del reporte general.
+- Producto buscable por nombre o SKU, filtrado por categoría.
+- Una fila por cliente del día, cantidad editable y modo CAJA/UNIDAD/BULTO por cliente.
+- Conversión del inventario: factor principal INVENTARIO → UND; respaldo LISTA → UD por CJ.
+- Factor 1 = BULTO sin conversión. Pepsi-Cola solo se reporta por caja.
+- ADC para productos REFRESCO: 1 PUERTA = 25 cajas y 2 PUERTA = 60 cajas por SKU; mínimo de 6 cajas por cliente ADC. 3 PUERTA no tiene cuota fija definida. Es una regla provisional por producto.
+- Editor de factores de conversión con búsqueda; los cambios se guardan en factores_conversion.json.
+- Repartir restante, completar categoría, limpiar día, resumen semanal por SKU.
+- Guardar Excel y recuperar asignaciones previamente exportadas.
+- El Excel de guardado conserva las demás hojas y estructura del libro original.
 
 INSTALACIÓN
 -----------
-1. Cierra ROCO si está abierto.
-2. Haz una copia de seguridad de los siete archivos indicados.
-3. Extrae este ZIP dentro de la carpeta raíz del proyecto y acepta reemplazarlos.
-4. Conserva los demás módulos del proyecto, entre ellos configuracion.py, inventario.py,
-   lista_buscable.py, catalogo_plantilla.py, lector_excel.py y procesador_reporte.py.
-5. Inicia la aplicación como de costumbre ejecutando principal.py.
+1. Descomprime el proyecto completo y conserva las carpetas resources y src.
+2. Cierra ROCO antes de sustituir cualquier archivo.
+3. Desde la carpeta src, ejecuta: pip install -r requisitos.txt
+4. Desde la misma carpeta, ejecuta: python principal.py
 
-NOTAS
------
-- La apariencia se configura desde principal.py; no se necesita instalar un tema externo.
-- Se utiliza ttk con el tema clam para mantener una apariencia consistente entre versiones
-  compatibles de Windows y Tkinter. El diseño está inspirado en Windows 11, pero los bordes
-  redondeados nativos del sistema no forman parte de ttk estándar.
-- Los archivos Python de este paquete pasaron la comprobación de sintaxis y la interfaz se
-  visualizó con datos simulados. La comprobación completa con los archivos Excel reales requiere
-  ejecutar el proyecto con los módulos auxiliares y las plantillas locales del usuario.
+El proyecto debe conservar también estos módulos auxiliares: lista_buscable.py, lector_excel.py,
+escritor_plantilla.py, inventario.py, catalogo_plantilla.py, filtro_compras.py,
+exportador_plantilla.py, procesador_reporte.py, configuracion.py y utilidades.py.
+
+CONVERSIÓN
+----------
+- UnidadCompra = CAJ: cantidad de cajas × factor de INVENTARIO!UND = unidades.
+- UnidadCompra = UNI/UND: se conserva como unidades.
+- Factor de INVENTARIO!UND = 1: se reporta como bulto, sin conversión.
+- Pepsi-Cola: solo CAJA.
+- Para editar un factor: botón Factores, buscar por código o nombre y hacer doble clic sobre el valor Factor.
+
+GUARDADO
+--------
+El botón Guardar Excel crea una copia nueva: no sobrescribe el archivo base.
+Las cantidades se escriben con código limpio y sufijo junto al número: 12345 6und, 12345 2cj,
+o 12345 2bto. Para recuperar el progreso usa Abrir guardado y selecciona el archivo exportado.
+
+IMPORTANTE
+----------
+El factor 1 se trata como bulto porque así lo ha especificado el equipo. La cuota ADC de 1 y 2
+puertas se aplica actualmente individualmente a cada SKU de REFRESCO, hasta que el equipo confirme
+si la cuota debe sumarse entre todos los refrescos del cliente. Para 3 PUERTA no se ha inventado
+una cuota adicional; se conserva únicamente el mínimo de 6 cajas.

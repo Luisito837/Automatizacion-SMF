@@ -17,7 +17,7 @@ ALTO_DEL_LOGO = 42
 
 class BarraSuperior:
     def __init__(self, padre, ruta_logo, dia_inicial, al_cambiar_dia,
-                 al_cargar_reporte, al_actualizar_clientes, al_ver_clientes, al_exportar):
+                 al_cargar_reporte, al_abrir_guardado, al_actualizar_clientes, al_ver_clientes, al_exportar):
         self.marco = ttk.Frame(padre, style="HeaderCard.TFrame", padding=(22, 14, 22, 16))
         self.marco.columnconfigure(0, weight=1)
 
@@ -36,11 +36,13 @@ class BarraSuperior:
         botones = ttk.Frame(self.marco, style="Header.TFrame")
         botones.grid(row=0, column=1, sticky="e", padx=(16, 0))
         ttk.Button(
-            botones, text="Exportar plantilla", style="Secondary.TButton", command=al_exportar
-        ).pack(side="left", padx=(0, 8))
+            botones, text="Abrir guardado", style="Secondary.TButton", command=al_abrir_guardado
+        ).pack(side="left", padx=(0, 7))
         ttk.Button(
-            botones, text="＋  Cargar reporte general", style="Accent.TButton",
-            command=al_cargar_reporte
+            botones, text="Guardar Excel", style="Secondary.TButton", command=al_exportar
+        ).pack(side="left", padx=(0, 7))
+        ttk.Button(
+            botones, text="＋  Cargar reporte", style="Accent.TButton", command=al_cargar_reporte
         ).pack(side="left")
 
         controles = ttk.Frame(self.marco, style="Header.TFrame")
