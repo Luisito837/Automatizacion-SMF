@@ -1,7 +1,5 @@
 # Automatización SMF · ROCO
 
-# Automatización SMF · ROCO
-
 Aplicación de escritorio en Python/Tkinter para distribuir entre los clientes por día de la semana lo que se compró, usando el Reporte General de Compras y la plantilla FACTURACION SMF.
 
 ## Características principales
@@ -36,7 +34,7 @@ pip install -r requisitos.txt
 2. Instala las dependencias, desde `src/`:
 
    ```bash
-   pip install -r requisitos.txt
+   pyinstaller --noconsole --onefile --name "ROCO Distribucion" --icon roco.ico --add-data "LOGO_ROCO_3.jpg;." principal.py
    ```
 
 3. Ejecuta `python principal.py` desde la carpeta `src/`.

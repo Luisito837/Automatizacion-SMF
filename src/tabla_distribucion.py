@@ -11,7 +11,7 @@ FILA_ALTERNA = "#F8FAFD"
 COLOR_TEXTO = "#172033"
 COLOR_SECUNDARIO = "#627089"
 COLOR_ENCABEZADO = "#EFF4FB"
-COLOR_ALERTA = "#B42318"
+COLOR_RECORDATORIO = "#2563EB"
 
 
 class TablaDistribucion:
@@ -248,8 +248,8 @@ class TablaDistribucion:
                 if estado is None:
                     fila["nevera"].config(text="", fg=COLOR_SECUNDARIO)
                 else:
-                    fila["nevera"].config(
-                        text=estado.texto(), fg=COLOR_ALERTA if estado.hay_alerta else COLOR_SECUNDARIO)
+                    color = COLOR_RECORDATORIO if estado.hay_alerta else COLOR_SECUNDARIO
+                    fila["nevera"].config(text=estado.texto(), fg=color)
             except tk.TclError:
                 pass
 

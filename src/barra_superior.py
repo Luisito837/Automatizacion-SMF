@@ -17,7 +17,8 @@ ALTO_DEL_LOGO = 42
 
 class BarraSuperior:
     def __init__(self, padre, ruta_logo, dia_inicial, al_cambiar_dia,
-                 al_cargar_reporte, al_abrir_guardado, al_actualizar_clientes, al_ver_clientes, al_exportar):
+                 al_cargar_reporte, al_abrir_guardado, al_actualizar_clientes,
+                 al_ver_clientes, al_exportar, al_volver_inicio=None):
         self.marco = ttk.Frame(padre, style="HeaderCard.TFrame", padding=(22, 14, 22, 16))
         self.marco.columnconfigure(0, weight=1)
 
@@ -28,21 +29,25 @@ class BarraSuperior:
         bloque_titulo = ttk.Frame(identidad, style="Header.TFrame")
         bloque_titulo.pack(side="left", padx=(12, 0))
         ttk.Label(bloque_titulo, text="Distribución de alimentos", style="HeaderTitle.TLabel").pack(anchor="w")
-        ttk.Label(
+        self.etiqueta_subtitulo = ttk.Label(
             bloque_titulo, text="Asignaciones por cliente · Control de existencias",
             style="HeaderSubtitle.TLabel"
-        ).pack(anchor="w", pady=(1, 0))
+        )
+        self.etiqueta_subtitulo.pack(anchor="w", pady=(1, 0))
 
         botones = ttk.Frame(self.marco, style="Header.TFrame")
         botones.grid(row=0, column=1, sticky="e", padx=(16, 0))
+        
+        if al_volver_inicio:
+            ttk.Button(
+                botones, text="🏠  Inicio", style="Quiet.TButton", command=al_volver_inicio
+            ).pack(side="left", padx=(0, 10))
+
         ttk.Button(
-            botones, text="Abrir guardado", style="Secondary.TButton", command=al_abrir_guardado
+            botones, text="Guardar Excel", style="Accent.TButton", command=al_exportar
         ).pack(side="left", padx=(0, 7))
         ttk.Button(
-            botones, text="Guardar Excel", style="Secondary.TButton", command=al_exportar
-        ).pack(side="left", padx=(0, 7))
-        ttk.Button(
-            botones, text="＋  Cargar reporte", style="Accent.TButton", command=al_cargar_reporte
+            botones, text="Abrir otro...", style="Secondary.TButton", command=al_abrir_guardado
         ).pack(side="left")
 
         controles = ttk.Frame(self.marco, style="Header.TFrame")
@@ -70,6 +75,12 @@ class BarraSuperior:
 
     def dia_seleccionado(self) -> str:
         return self.variable_dia.get()
+
+    def mostrar_archivo_actual(self, nombre: str) -> None:
+        if nombre:
+            self.etiqueta_subtitulo.config(text=f"📁 Archivo de trabajo: {nombre}")
+        else:
+            self.etiqueta_subtitulo.config(text="Asignaciones por cliente · Control de existencias")
 
     def mostrar_cantidad_de_clientes(self, cantidad: int) -> None:
         sufijo = "cliente" if cantidad == 1 else "clientes"

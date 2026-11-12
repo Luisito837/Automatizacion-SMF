@@ -4,6 +4,8 @@ from dataclasses import dataclass, field
 from configuracion import (
     CUOTA_REFRESCOS_POR_PUERTAS, MINIMO_CAJAS_REFRESCO_ADC,
     MODO_BULTO, MODO_CAJA, MODO_UNIDAD,
+    PALABRAS_CLAVE_PERMITE_UNIDADES_ADC, PALABRAS_CLAVE_EXCLUYE_UNIDADES_ADC,
+    TIPOS_INVENTARIO_PERMITE_UNIDADES_ADC,
 )
 from inventario import Inventario, Producto
 from utilidades import normalizar_codigo, normalizar_texto
@@ -51,9 +53,9 @@ class EstadoNevera:
         progreso = f"{asignadas}/{self.cuota_cajas} cj" if self.cuota_cajas else f"{asignadas} cj"
         texto = f"{self.puertas} puerta{'s' if self.puertas != 1 else ''} · {progreso}"
         if self.incumple_minimo:
-            texto += f"  ⚠ mín. {MINIMO_CAJAS_REFRESCO_ADC} cj"
-        if self.excede_cuota:
-            texto += "  ⚠ excede"
+            texto += f"  (sugerido mín. {MINIMO_CAJAS_REFRESCO_ADC} cj)"
+        elif self.excede_cuota:
+            texto += "  (cuota superada)"
         return texto
 
 
@@ -139,6 +141,33 @@ class Distribucion:
         return list(self._clientes_por_clave.values())
 
     # ---------- modos válidos para cada producto/cliente ----------
+    def _permite_unidades_adc(self, producto: Producto) -> bool:
+        """Devuelve True si este producto puede reportarse en unidades aunque el cliente
+        tenga nevera ADC.
+
+        Regla de negocio:
+        - Categoría APC (Alimentos Polar) → siempre permite unidades.
+        - BNC (Cervecería): Gatorade, agua, Lipton y línea Yuquiri permiten unidades,
+          EXCEPTO 'Yukipac LD' que es siempre en cajas.
+        """
+        tipo = normalizar_texto(producto.tipo_inventario)
+        tipos_ok = {normalizar_texto(t) for t in TIPOS_INVENTARIO_PERMITE_UNIDADES_ADC}
+        if tipo not in tipos_ok:
+            return False
+        descripcion = normalizar_texto(producto.descripcion)
+        # Excepción explícita: Yukipac LD nunca en unidades para ADC.
+        for excluida in PALABRAS_CLAVE_EXCLUYE_UNIDADES_ADC:
+            if normalizar_texto(excluida) in descripcion:
+                return False
+        # APC siempre permite unidades.
+        if normalizar_texto("ALIMENTOS POLAR") == tipo:
+            return True
+        # BNC: solo productos con palabras clave específicas.
+        for clave in PALABRAS_CLAVE_PERMITE_UNIDADES_ADC:
+            if normalizar_texto(clave) in descripcion:
+                return True
+        return False
+
     def modos_permitidos(self, cliente: ClienteDistribucion, producto: Producto) -> tuple:
         if producto is None:
             return (MODO_CAJA, MODO_UNIDAD)
@@ -146,7 +175,7 @@ class Distribucion:
             return (MODO_BULTO,)
         if producto.solo_cajas:
             return (MODO_CAJA,)
-        if producto.es_refresco and cliente.puertas > 0:
+        if producto.es_refresco and cliente.puertas > 0 and not self._permite_unidades_adc(producto):
             return (MODO_CAJA,)
         return (MODO_CAJA, MODO_UNIDAD)
 
@@ -163,8 +192,9 @@ class Distribucion:
         permitidos = self.modos_permitidos(cliente, producto)
         modo_final = modo if modo in permitidos else self.modo_predeterminado(cliente, producto)
         self._modos[(cliente.identificador, producto.codigo)] = modo_final
-        # El mínimo ADC se mide en cajas. Las asignaciones ADC de refrescos siempre van en caja.
-        if producto.es_refresco and cliente.puertas > 0 and not producto.es_bulto:
+        # El mínimo ADC se mide en cajas. Las asignaciones ADC de refrescos siempre van en caja
+        # salvo los productos habilitados para unidades (Gatorade, agua, Lipton, Yuquiri, APC).
+        if producto.es_refresco and cliente.puertas > 0 and not producto.es_bulto and not self._permite_unidades_adc(producto):
             self._modos[(cliente.identificador, producto.codigo)] = MODO_CAJA
             return MODO_CAJA
         return modo_final
@@ -183,10 +213,9 @@ class Distribucion:
         codigo = normalizar_codigo(codigo)
         producto = next((p for p in self.inventario.todos() if normalizar_codigo(p.codigo) == codigo), None)
         valor = max(0, int(cantidad or 0))
-        if producto and valor > 0 and producto.es_refresco and cliente.puertas > 0 and not producto.es_bulto:
-            # Hasta confirmar otro criterio con el equipo, 6 cajas mínimo por cliente-producto.
+        if producto and valor > 0 and producto.es_refresco and cliente.puertas > 0 and not producto.es_bulto and not self._permite_unidades_adc(producto):
+            # El mínimo ADC (6 cj) solo se muestra como advertencia; ya no se fuerza el valor.
             self.fijar_modo(cliente, producto, MODO_CAJA)
-            valor = max(valor, MINIMO_CAJAS_REFRESCO_ADC)
         clave = (cliente.identificador, codigo)
         if valor > 0:
             self._cantidades[clave] = valor
@@ -248,7 +277,7 @@ class Distribucion:
         restante = max(0, int(producto.stock_unidades or 0) - asignadas_otros_dias)
         pasos, topes, minimos = {}, {}, {}
         for cliente in self.clientes:
-            if producto.es_refresco and cliente.puertas > 0 and not producto.es_bulto:
+            if producto.es_refresco and cliente.puertas > 0 and not producto.es_bulto and not self._permite_unidades_adc(producto):
                 self.fijar_modo(cliente, producto, MODO_CAJA)
                 minimos[cliente.identificador] = MINIMO_CAJAS_REFRESCO_ADC * producto.factor
                 topes[cliente.identificador] = self._tope_por_nevera(cliente, producto)

@@ -26,6 +26,15 @@ MINIMO_CAJAS_REFRESCO_ADC = 6
 CATEGORIA_REFRESCOS = "REFRESCO"
 TIPO_PEPSI = "PEPSI-COLA"
 
+# Categorías de tipo inventario (CodTipoInv) que permiten reporte en unidades para ADC.
+# BNC = Cervecería Polar C.A.; APC = Alimentos Polar.
+TIPOS_INVENTARIO_PERMITE_UNIDADES_ADC = ("CERVEZA", "CERVECERIA POLAR_C.A", "ALIMENTOS POLAR")
+
+# Palabras clave en la descripción del producto que habilitan unidades para ADC (BNC).
+# Excepción: "YUKIPAC LD" queda siempre excluido (solo cajas).
+PALABRAS_CLAVE_PERMITE_UNIDADES_ADC = ("GATORADE", "AGUA", "LIPTON", "YUQUIRI", "YUKIPIRI")
+PALABRAS_CLAVE_EXCLUYE_UNIDADES_ADC = ("YUKIPAC LD",)
+
 COLOR_ROJO_ROCO = "#E60000"
 COLOR_AZUL_ROCO = "#1E5BFF"
 COLOR_ENCABEZADO = "#E8EEF9"

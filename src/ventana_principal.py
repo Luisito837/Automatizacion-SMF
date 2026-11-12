@@ -10,7 +10,9 @@ from catalogo_plantilla import CatalogoClientes, LectorPlantilla
 from configuracion import RUTA_FACTORES, RUTA_LOGO, RUTA_PLANTILLA, MODO_BULTO, MODO_CAJA, MODO_UNIDAD
 from distribucion import Distribucion
 from exportador_plantilla import ExportadorPlantilla
+from gestor_recientes import GestorRecientes, analizar_archivo_excel
 from inventario import ConstructorInventario, Inventario
+from menu_inicio import PantallaInicio
 from panel_stock import PanelStock
 from procesador_reporte import ProcesadorReporte
 from tabla_distribucion import TablaDistribucion
@@ -24,6 +26,7 @@ class VentanaPrincipal:
         self.procesador = procesador
         self.lector_plantilla = lector_plantilla
         self.exportador = exportador
+        self.gestor_recientes = GestorRecientes(self.exportador.lector_excel)
         self.ruta_plantilla_generada = None
         self.distribucion = Distribucion(Inventario())
         self.catalogo_clientes = CatalogoClientes()
@@ -42,31 +45,42 @@ class VentanaPrincipal:
         self._armar_pantalla()
         self._vincular_teclas_de_producto()
         self._cargar_clientes()
-        recuperado = False
-        if self.ruta_plantilla and self.ruta_plantilla.exists():
-            recuperado = self._recuperar_plantilla(self.ruta_plantilla, silencioso=True)
-        if not recuperado:
-            self._cargar_lista_productos()
-        self.tabla.mostrar_producto(self._producto_seleccionado())
-        self._actualizar_stock()
+
+        # Iniciar mostrando el Menú de Inicio estilo Photoshop
+        self._mostrar_inicio()
 
     # ---------- armado de la interfaz ----------
     def _armar_pantalla(self) -> None:
         self.raiz.columnconfigure(0, weight=1)
-        self.raiz.rowconfigure(2, weight=1)
+        self.raiz.rowconfigure(0, weight=1)
+
+        # 1. Menú de Inicio estilo Photoshop
+        self.pantalla_inicio = PantallaInicio(
+            self.raiz,
+            self.gestor_recientes,
+            self._abrir_archivo,
+            self._al_nuevo_reparto,
+            self.ruta_plantilla
+        )
+
+        # 2. Área de Trabajo (distribución y existencias)
+        self.contenedor_trabajo = ttk.Frame(self.raiz, style="TFrame")
+        self.contenedor_trabajo.columnconfigure(0, weight=1)
+        self.contenedor_trabajo.rowconfigure(2, weight=1)
+
         self.barra_superior = BarraSuperior(
-            self.raiz, RUTA_LOGO, obtener_dia_actual(), self._al_cambiar_dia,
+            self.contenedor_trabajo, RUTA_LOGO, obtener_dia_actual(), self._al_cambiar_dia,
             self._cargar_reporte, self._abrir_guardado, self._recargar_clientes,
-            self._ver_clientes, self._exportar_plantilla
+            self._ver_clientes, self._exportar_plantilla, al_volver_inicio=self._mostrar_inicio
         )
         self.barra_herramientas = BarraHerramientas(
-            self.raiz, self._al_cambiar_categoria, self._al_cambiar_producto,
+            self.contenedor_trabajo, self._al_cambiar_categoria, self._al_cambiar_producto,
             self._aplicar_valor_global, self._autorrellenar, self._autorrellenar_categoria,
             self._limpiar_todo, self._reportar_todo_como, self._editar_factores,
             self._resumen_semanal
         )
 
-        cuerpo = ttk.Frame(self.raiz, padding=(16, 12, 16, 8))
+        cuerpo = ttk.Frame(self.contenedor_trabajo, padding=(16, 12, 16, 8))
         cuerpo.columnconfigure(0, weight=1)
         cuerpo.columnconfigure(1, weight=0)
         cuerpo.rowconfigure(0, weight=1)
@@ -79,10 +93,96 @@ class VentanaPrincipal:
         self.barra_herramientas.marco.grid(row=1, column=0, sticky="ew", padx=16, pady=(10, 0))
         cuerpo.grid(row=2, column=0, sticky="nsew")
 
-        pie = ttk.Frame(self.raiz, style="Footer.TFrame", padding=(18, 2, 18, 10))
+        pie = ttk.Frame(self.contenedor_trabajo, style="Footer.TFrame", padding=(18, 2, 18, 10))
         ttk.Label(pie, text="ROCO  ·  Distribución por cliente", style="Footer.TLabel").pack(side="left")
         ttk.Label(pie, text="El stock y las asignaciones reflejan toda la semana", style="Footer.TLabel").pack(side="right")
         pie.grid(row=3, column=0, sticky="ew")
+
+    # ---------- navegación entre Inicio y Trabajo ----------
+    def _mostrar_inicio(self) -> None:
+        """Muestra el Menú de Inicio estilo Photoshop."""
+        if hasattr(self, "contenedor_trabajo"):
+            self.contenedor_trabajo.grid_remove()
+        self.pantalla_inicio.refrescar_recientes()
+        self.pantalla_inicio.grid(row=0, column=0, sticky="nsew")
+
+    def _mostrar_trabajo(self) -> None:
+        """Muestra el área de trabajo activa."""
+        self.pantalla_inicio.grid_remove()
+        self.contenedor_trabajo.grid(row=0, column=0, sticky="nsew")
+        if self._producto_seleccionado():
+            self.tabla.mostrar_producto(self._producto_seleccionado())
+            self._actualizar_stock()
+
+    # ---------- apertura y detección inteligente ----------
+    def _abrir_archivo(self, ruta: Path) -> None:
+        """Abre un archivo detectando si tiene trabajo a medio hacer o si es plantilla limpia."""
+        ruta = Path(ruta).resolve()
+        if not ruta.exists():
+            messagebox.showerror("Error", f"No se encontró el archivo:\n{ruta}")
+            return
+
+        self.raiz.config(cursor="watch")
+        self.raiz.update_idletasks()
+        try:
+            info = analizar_archivo_excel(ruta, self.exportador.lector_excel)
+        finally:
+            self.raiz.config(cursor="")
+
+        self.ruta_plantilla = ruta
+        self._cargar_clientes()
+
+        if info.es_trabajo_en_progreso:
+            if not self._recuperar_plantilla(ruta, silencioso=False):
+                messagebox.showwarning(
+                    "No se pudo recuperar el trabajo",
+                    "No se encontraron compras válidas en el archivo seleccionado."
+                )
+                return
+            self.ruta_plantilla_generada = ruta
+            self.gestor_recientes.guardar_reciente(ruta)
+            self.barra_superior.mostrar_archivo_actual(ruta.name)
+            self._mostrar_trabajo()
+        else:
+            # Es una plantilla sin compras cargadas aún
+            resp = messagebox.askyesno(
+                "Plantilla sin compras",
+                f"El archivo '{ruta.name}' es una plantilla base (aún no contiene compras).\n\n"
+                "¿Desea seleccionar un Reporte General de Compras para cargar los alimentos y comenzar?"
+            )
+            if resp:
+                self._cargar_reporte_con_plantilla(ruta)
+
+    def _al_nuevo_reparto(self, ruta_reporte: Path, ruta_plantilla: Path) -> None:
+        """Genera un nuevo reparto inyectando el reporte en la plantilla."""
+        self.raiz.config(cursor="watch")
+        self.raiz.update_idletasks()
+        try:
+            resultado = self.procesador.procesar(ruta_reporte, ruta_plantilla)
+        except Exception as error:
+            messagebox.showerror("No se pudo procesar el reporte", str(error))
+            return
+        finally:
+            self.raiz.config(cursor="")
+
+        self.ruta_plantilla = ruta_plantilla
+        self.ruta_plantilla_generada = resultado.ruta_salida
+        self.distribucion.cargar_inventario(resultado.inventario)
+        self._cargar_clientes()
+        self._cargar_lista_productos()
+        self.gestor_recientes.guardar_reciente(resultado.ruta_salida)
+        self.barra_superior.mostrar_archivo_actual(resultado.ruta_salida.name)
+        self._mostrar_trabajo()
+        messagebox.showinfo("Reporte cargado con éxito", resultado.resumen())
+
+    def _cargar_reporte_con_plantilla(self, ruta_plantilla: Path) -> None:
+        ruta_reporte = filedialog.askopenfilename(
+            title="Seleccione el Reporte General de Compras",
+            filetypes=[("Excel", "*.xlsx *.xlsm"), ("Todos los archivos", "*.*")],
+        )
+        if not ruta_reporte:
+            return
+        self._al_nuevo_reparto(Path(ruta_reporte), ruta_plantilla)
 
     # ---------- compras e inventario ----------
     def _cargar_reporte(self) -> None:
@@ -233,15 +333,8 @@ class VentanaPrincipal:
             initialdir=str(self.ruta_plantilla.parent if self.ruta_plantilla else Path.cwd()),
             filetypes=[("Excel", "*.xlsx *.xlsm"), ("Todos los archivos", "*.*")],
         )
-        if not ruta:
-            return
-        self.ruta_plantilla = Path(ruta)
-        self._cargar_clientes()
-        if not self._recuperar_plantilla(self.ruta_plantilla, silencioso=False):
-            messagebox.showwarning(
-                "No se encontró un guardado recuperable",
-                "La plantilla no contiene compras válidas en su hoja de compras, o no hay productos que pasen el filtro."
-            )
+        if ruta:
+            self._abrir_archivo(Path(ruta))
 
     def _recuperar_plantilla(self, ruta, silencioso: bool = False) -> bool:
         """Reconstruye inventario y asignaciones desde la plantilla exportada."""
@@ -323,6 +416,8 @@ class VentanaPrincipal:
             messagebox.showerror("No se pudo guardar el Excel", str(error))
             return
         self.ruta_plantilla_generada = Path(ruta)
+        self.gestor_recientes.guardar_reciente(self.ruta_plantilla_generada)
+        self.barra_superior.mostrar_archivo_actual(self.ruta_plantilla_generada.name)
         messagebox.showinfo("Excel guardado", resultado.resumen())
 
     # ---------- operación diaria ----------
